@@ -188,8 +188,10 @@ impl fmt::Display for Constructible{
                     if **a != Constructible::from_integer(0) {
                         write!(f,"{}+",a)?
                     }
-                    let b=format!("{}",b);
-                    if b.contains('+') {
+                    if match &**b{
+                        Rat(_)=>false,
+                        Con{a,b,r:_}=> !(a.is_zero()||b.is_zero()),
+                    } {
                         write!(f,"({})*sqrt({})",b,r)
                     }else{
                         write!(f,"{}*sqrt({})",b,r)
@@ -395,7 +397,9 @@ mod tests {
     #[test]
     fn printing(){
         let a=(&Constructible::from_integer(3).sqrt()+&Constructible::from_integer(1)).sqrt();
-        print!("{}={}",a,a.to_float());
+        println!("{}={}",a,a.to_float());
+        let b=&(&Constructible::from_integer(5).sqrt()+&Constructible::from_integer(2))*&(&Constructible::from_integer(6).sqrt()+&Constructible::from_integer(1));
+        println!("{}={}",b,b.to_float());
     }
 
     #[test]
