@@ -103,11 +103,13 @@ impl Constructible {
         }
     }
     fn try_sqrt(&self) -> Option<Constructible> {
-        match self {
-            Rat(x) => {
-                if x < &rational::Rational::from_integer(0) {
-                    None
-                } else {
+        if self < &Constructible::from_integer(0) {
+            None
+        } else if self == &Constructible::from_integer(0) {
+            Some(self.clone())
+        } else {
+            match self {
+                Rat(x) => {
                     let &n = x.numer();
                     let &d = x.denom();
                     let (rn, rd) = (n.sqrt(), d.sqrt());
@@ -117,44 +119,51 @@ impl Constructible {
                         None
                     }
                 }
-            }
-            Con { a, b, r } => {
-                let a = &**a;
-                let b = &**b;
-                match (&(a * a) - &(&(b * b) * r)).try_sqrt() {
-                    Some(ref n) => {
-                        if let Some(u) = (&(n + a) / &(Constructible::from_integer(2))).try_sqrt() {
-                            Some(Con {
-                                a: Rc::new(u.clone()),
-                                b: Rc::new(b / &(&(Constructible::from_integer(2)) * &u)),
-                                r: Rc::clone(r),
-                            })
-                        } else if let Some(v) =
-                            (&(n + a) / &(&(Constructible::from_integer(2)) * &r)).try_sqrt()
-                        {
-                            Some(Con {
-                                a: Rc::new(b / &(&(Constructible::from_integer(2)) * &v)),
-                                b: Rc::new(v),
-                                r: Rc::clone(r),
-                            })
-                        } else {
-                            None
+                Con { a, b, r } => {
+                    let a = &**a;
+                    let b = &**b;
+                    match (&(a * a) - &(&(b * b) * r)).try_sqrt() {
+                        Some(ref n) => {
+                            if let Some(u) =
+                                (&(n + a) / &(Constructible::from_integer(2))).try_sqrt()
+                            {
+                                Some(Con {
+                                    a: Rc::new(u.clone()),
+                                    b: Rc::new(b / &(&(Constructible::from_integer(2)) * &u)),
+                                    r: Rc::clone(r),
+                                })
+                            } else if let Some(v) =
+                                (&(n + a) / &(&(Constructible::from_integer(2)) * &r)).try_sqrt()
+                            {
+                                Some(Con {
+                                    a: Rc::new(b / &(&(Constructible::from_integer(2)) * &v)),
+                                    b: Rc::new(v),
+                                    r: Rc::clone(r),
+                                })
+                            } else {
+                                None
+                            }
                         }
+                        None => None,
                     }
-                    None => None,
                 }
             }
         }
     }
     pub fn sqrt(&self) -> Constructible {
-        assert!(self >= &(self - self), "sqrt called with negative argument");
         match self.try_sqrt() {
             Some(x) => x,
-            None => Con {
-                a: Rc::new(Constructible::from_integer(0).join(self)),
-                b: Rc::new(Constructible::from_integer(1).join(self)),
-                r: Rc::new(self.clone()),
-            },
+            None => {
+                assert!(
+                    self >= &Constructible::from_integer(0),
+                    "sqrt called with negative argument",
+                );
+                Con {
+                    a: Rc::new(Constructible::from_integer(0).join(self)),
+                    b: Rc::new(Constructible::from_integer(1).join(self)),
+                    r: Rc::new(self.clone()),
+                }
+            }
         }
     }
     pub fn from_rational(x: rational::Rational) -> Constructible {
@@ -163,38 +172,38 @@ impl Constructible {
     pub fn from_integer(x: isize) -> Constructible {
         Rat(rational::Rational::from_integer(x))
     }
-    pub fn to_float(&self) -> f32{
+    pub fn to_float(&self) -> f32 {
         match self {
             Rat(x) => *x.numer() as f32 / *x.denom() as f32,
-            Con{a,b,r} => a.to_float()+b.to_float()*r.to_float().sqrt(),
+            Con { a, b, r } => a.to_float() + b.to_float() * r.to_float().sqrt(),
         }
     }
 }
 
-impl fmt::Display for Constructible{
+impl fmt::Display for Constructible {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self{
-            Rat(x)=> write!(f,"{}",x),
-            Con{a,b,r}=> {
+        match self {
+            Rat(x) => write!(f, "{}", x),
+            Con { a, b, r } => {
                 if **b == Constructible::from_integer(0) {
-                    write!(f,"{}",a)
-                }else if **b == Constructible::from_integer(1) {
+                    write!(f, "{}", a)
+                } else if **b == Constructible::from_integer(1) {
                     if **a == Constructible::from_integer(0) {
-                        write!(f,"sqrt({})",r)
-                    }else {
-                        write!(f,"{}+sqrt({})",a,r)
+                        write!(f, "sqrt({})", r)
+                    } else {
+                        write!(f, "{}+sqrt({})", a, r)
                     }
-                }else {
+                } else {
                     if **a != Constructible::from_integer(0) {
-                        write!(f,"{}+",a)?
+                        write!(f, "{}+", a)?
                     }
-                    if match &**b{
-                        Rat(_)=>false,
-                        Con{a,b,r:_}=> !(a.is_zero()||b.is_zero()),
+                    if match &**b {
+                        Rat(_) => false,
+                        Con { a, b, r: _ } => !(a.is_zero() || b.is_zero()),
                     } {
-                        write!(f,"({})*sqrt({})",b,r)
-                    }else{
-                        write!(f,"{}*sqrt({})",b,r)
+                        write!(f, "({})*sqrt({})", b, r)
+                    } else {
+                        write!(f, "{}*sqrt({})", b, r)
                     }
                 }
             }
@@ -389,17 +398,19 @@ mod tests {
         );
         assert_eq!(
             Constructible::from_integer(2).sqrt(),
-            &((&Constructible::from_integer(3).sqrt()+&Constructible::from_integer(1)).sqrt())
-            * &((&Constructible::from_integer(3).sqrt()-&Constructible::from_integer(1)).sqrt()),
+            &((&Constructible::from_integer(3).sqrt() + &Constructible::from_integer(1)).sqrt())
+                * &((&Constructible::from_integer(3).sqrt() - &Constructible::from_integer(1))
+                    .sqrt()),
         );
     }
 
     #[test]
-    fn printing(){
-        let a=(&Constructible::from_integer(3).sqrt()+&Constructible::from_integer(1)).sqrt();
-        println!("{}={}",a,a.to_float());
-        let b=&(&Constructible::from_integer(5).sqrt()+&Constructible::from_integer(2))*&(&Constructible::from_integer(6).sqrt()+&Constructible::from_integer(1));
-        println!("{}={}",b,b.to_float());
+    fn printing() {
+        let a = (&Constructible::from_integer(3).sqrt() + &Constructible::from_integer(1)).sqrt();
+        println!("{}={}", a, a.to_float());
+        let b = &(&Constructible::from_integer(5).sqrt() + &Constructible::from_integer(2)).sqrt()
+            * &(&Constructible::from_integer(6).sqrt() + &Constructible::from_integer(2).sqrt());
+        println!("{}={}", dbg!(&b), b.to_float());
     }
 
     #[test]
